@@ -1,9 +1,8 @@
 import User from "../models/user.models.js";
 import jwt from "jsonwebtoken";
-import { sendEmail } from "../utils/sendEmail.js";
 import Otp from "../models/otp.module.js";
 import userModels from "../models/user.models.js";
-
+import { sendEmail } from "../utils/sendEmail.js";
 const generateToken = (userId) => {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
@@ -74,7 +73,6 @@ const signup = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { email } = req.body;
-    console.log("mai chal rha hoon  bhai");
     console.log("email", email);
     if (!email) {
       return res.status(400).json({
@@ -97,7 +95,12 @@ const login = async (req, res) => {
     const resEmailOtp = await sendEmail(email);
 
     const token = generateToken(user._id);
-    localStorage.setItem("token", token);
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
 
     if (resEmailOtp.success) {
       return res.status(200).json({
