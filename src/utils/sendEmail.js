@@ -7,14 +7,9 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-transporter.verify((err, success) => {
-  console.log("ERR =", err);
-  console.log("SUCCESS =", success);
-});
 
-export async function sendEmail(email) {
+export async function sendEmail(email,otp) {
   try {
-    const otp = Math.floor(100000 + Math.random() * 90000);
     const info = await transporter.sendMail({
       from: "rishicoding56@gmail.com",
       to: email,

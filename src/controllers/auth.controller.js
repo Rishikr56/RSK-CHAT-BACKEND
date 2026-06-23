@@ -3,8 +3,9 @@ import jwt from "jsonwebtoken";
 import Otp from "../models/otp.module.js";
 import userModels from "../models/user.models.js";
 import { sendEmail } from "../utils/sendEmail.js";
-const generateToken = (userId) => {
-  return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
+import generateOtp from "../utils/GenerateOtp.js";
+const generateToken = (userId, email) => {
+  return jwt.sign({ id: userId, email: email }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
   });
 };
@@ -13,7 +14,6 @@ const generateToken = (userId) => {
 const signup = async (req, res) => {
   try {
     const { name, email, dob, mobileNo, location } = req.body;
-    console.log(name);
     if (!name || !email || !dob || !mobileNo) {
       return res.status(400).json({
         success: false,
@@ -33,16 +33,10 @@ const signup = async (req, res) => {
     }
 
     // Send email and get OTP
-    const emailResponse = await sendEmail(email);
-    const token = generateToken(existingUser._id);
-    // res.cookie("token", token, {
-    //   httpOnly: true,
-    //   sameSite: "lax",
-    // });
+    const newOtp = generateOtp();
+    const emailResponse = await sendEmail(email, newOtp);
 
-    localStorage.setItem("token", token);
     if (!emailResponse.success) {
-      localStorage.setItem("email", email);
       return res.status(500).json({
         success: false,
         message: "Failed to send OTP email",
@@ -51,15 +45,47 @@ const signup = async (req, res) => {
     }
 
     // Store OTP in database with 5 minute expiry
-    await Otp.create({
+    //check is otp email aleady exist or not
+    const isOtpEmailExist = await Otp.findOne({
       email,
-      otp: emailResponse.otp,
-      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
     });
 
+    if (isOtpEmailExist) {
+      await Otp.updateOne({ email }, { otp: newOtp });
+    } else {
+      await Otp.create({
+        email,
+        otp: newOtp,
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+      });
+    }
+
+    // Create user first, then send response
+    const newUser = await userModels.create({
+      name,
+      email,
+      dob,
+      location,
+      mobileNo,
+    });
+
+    //token generation
+    const tokenSignUp = generateToken(newUser._id, newUser.email);
+
+    res.cookie("token", tokenSignUp, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
     return res.status(200).json({
       success: true,
-      message: "OTP sent successfully",
+      message: "User signup successful and OTP sent successfully",
+      data: {
+        userId: newUser._id,
+        email: newUser.email,
+        otpSent: true,
+      },
     });
   } catch (error) {
     return res.status(500).json({
@@ -119,9 +145,10 @@ const login = async (req, res) => {
 // GET ME
 const getMe = async (req, res, next) => {
   try {
+    console.log("request aaya");
     //isme hum only check karte hai ki user verified hai ya nahi ---- isme hum cookies se data get karte hai kyuni ccokies me token hoti hai to use get karke verify karte hai
-    const { token } = req.body;
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log("token", req.cookies.token);
+    const decoded = jwt.verify(req.cookies.token, process.env.JWT_SECRET);
     req.userId = decoded.id;
     return res.status(200).json({
       success: true,
