@@ -15,10 +15,8 @@ router.post("/verify-otp", async (req, res) => {
     console.log(responseVerifyOtp);
 
     const decoded = jwt.verify(responseVerifyOtp.email, process.env.JWT_SECRET);
-    console.log("token decoded", decoded);
 
     const user = await Otp.findOne({ email: decoded.email });
-    console.log("backend data", user);
 
     if (!user) {
       return res.status(200).json({
@@ -28,7 +26,7 @@ router.post("/verify-otp", async (req, res) => {
     }
 
     const backendOtp = user.otp;
-    if (responseVerifyOtp.otp === backendOtp) {
+    if (responseVerifyOtp?.otp == backendOtp) {
       return res.status(200).json({
         message: "OTP is correct",
         success: true,

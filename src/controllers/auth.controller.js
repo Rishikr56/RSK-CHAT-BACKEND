@@ -99,7 +99,6 @@ const signup = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { email } = req.body;
-    console.log("email", email);
     if (!email) {
       return res.status(400).json({
         success: false,
@@ -117,10 +116,10 @@ const login = async (req, res) => {
         message: "User not found",
       });
     }
+    const loginOtp = generateOtp();
+    const resEmailOtp = await sendEmail(email, loginOtp);
 
-    const resEmailOtp = await sendEmail(email);
-
-    const token = generateToken(user._id);
+    const token = generateToken(user._id, user.email);
     res.cookie("token", token, {
       httpOnly: true,
       secure: false,
@@ -128,12 +127,15 @@ const login = async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    if (resEmailOtp.success) {
-      return res.status(200).json({
-        success: true,
-        message: "OTP sent successfully",
-      });
-    }
+    return res.status(200).json({
+      success: true,
+      message: "User signin successful and OTP sent successfully",
+      data: {
+        userId: user._id,
+        email: user.email,
+        otpSent: true,
+      },
+    });
   } catch (error) {
     return res.status(500).json({
       success: false,
