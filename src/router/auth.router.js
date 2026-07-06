@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import { getMe, login, signup } from "../controllers/auth.controller.js";
 import Otp from "../models/otp.module.js";
 import userModels from "../models/user.models.js";
-import conversationModels from "../models/conversation.models.js";
+
 const router = express.Router();
 
 router.post("/login", login);
@@ -50,10 +50,10 @@ router.post("/verify-otp", async (req, res) => {
 
 router.post("/search-mobile-no", async (req, res) => {
   try {
-    const ry = req.body;
-    console.log("sujit", ry);
+    const { mobileNo } = req.body;
 
-    const user = await userModels.findOne(mobileNo);
+    const user = await userModels.findOne({ mobileNo });
+    console.log(user);
     if (!user) {
       return res.status(400).json({
         success: false,
@@ -98,5 +98,16 @@ router.get("/token-get", (req, res) => {
     success: true,
     token: token,
   });
+});
+
+router.post("/name", (req, res) => {
+  const { id } = req.body;
+  if (!id) {
+    return res.status(200).json({
+      message: "Please give me Id",
+    });
+  }
+  const userName = userModels.findById({ id });
+  console.log(userName);
 });
 export default router;

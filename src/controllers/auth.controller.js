@@ -4,8 +4,8 @@ import Otp from "../models/otp.module.js";
 import userModels from "../models/user.models.js";
 import { sendEmail } from "../utils/sendEmail.js";
 import generateOtp from "../utils/GenerateOtp.js";
-const generateToken = (userId, email) => {
-  return jwt.sign({ id: userId, email: email }, process.env.JWT_SECRET, {
+const generateToken = (userId, email, name) => {
+  return jwt.sign({ id: userId, email: email, name }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
   });
 };
@@ -70,14 +70,21 @@ const signup = async (req, res) => {
     });
 
     //token generation
-    const tokenSignUp = generateToken(newUser._id, newUser.email);
-
+    const tokenSignUp = generateToken(newUser._id, newUser.email, name);
+    const otpToken = generateToken(user._id, user.email, name);
     res.cookie("token", tokenSignUp, {
       httpOnly: true,
       secure: false,
       sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
+    res.cookie("token", otpToken, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      maxAge: 5 * 60 * 1000,
+    });
+
     return res.status(200).json({
       success: true,
       message: "User signup successful and OTP sent successfully",
@@ -119,12 +126,19 @@ const login = async (req, res) => {
     const loginOtp = generateOtp();
     const resEmailOtp = await sendEmail(email, loginOtp);
 
-    const token = generateToken(user._id, user.email);
+    const token = generateToken(user._id, user.email, user.name);
+    const otpToken = generateToken(user._id, user.email, user.name);
     res.cookie("token", token, {
       httpOnly: true,
       secure: false,
       sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+    res.cookie("otpToken", otpToken, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      maxAge: 5 * 60 * 1000,
     });
 
     return res.status(200).json({
@@ -147,14 +161,16 @@ const login = async (req, res) => {
 // GET ME
 const getMe = async (req, res, next) => {
   try {
-    console.log("request aaya");
-    //isme hum only check karte hai ki user verified hai ya nahi ---- isme hum cookies se data get karte hai kyuni ccokies me token hoti hai to use get karke verify karte hai
-    console.log("token", req.cookies.token);
     const decoded = jwt.verify(req.cookies.token, process.env.JWT_SECRET);
+    console.log("doce", decoded);
     req.userId = decoded.id;
     return res.status(200).json({
       success: true,
       message: "User logged in successfully",
+      user: {
+        name: decoded.name,
+        id: decoded.id,
+      },
     });
   } catch (error) {
     return res.status(400).json({
